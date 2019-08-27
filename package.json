@@ -7,11 +7,14 @@
     "@types/node": "11.13.8",
     "@types/react": "16.8.15",
     "@types/react-dom": "16.8.4",
-    "fp-ts": "git://github.com/gcanti/fp-ts.git#v2-lib",
+    "fp-ts": "^2.0.1",
+    "proxy-state-tree": "^4.4.1",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.0",
-    "typescript": "3.4.5"
+    "rxjs": "^6.5.2",
+    "typescript": "3.4.5",
+    "why-did-you-update": "0.1.1"
   },
   "scripts": {
     "start": "react-scripts start",
