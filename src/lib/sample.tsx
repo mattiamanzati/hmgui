@@ -22,20 +22,26 @@ function render(model: Model) {
     );
 }
 
-const model = IR.newIORef(0)();
 
-const app = render(model.read())(model.write);
-const [appWidget, finalState] = app(C.initialWidgetBuilderState);
-
- class AppRunner extends React.Component<{app: C.Widget}, C.WidgetState>{
+ class AppRunner<A> extends React.Component<{getApp: I.IO<C.WidgetBuilder>}, C.WidgetState>{
   state = C.initialWidgetState
+  app: C.Widget
+
+  constructor(props: { getApp: I.IO<C.WidgetBuilder>}){
+    super(props)
+    this.app = this.getApp(props)
+  }
+
+  getApp(props: { getApp: I.IO<C.WidgetBuilder>}){
+    return props.getApp()(C.initialWidgetBuilderState)[0]
+  }
 
   eventLoop: (initialState: C.WidgetState) => C.WidgetState = 
     (initialState) => {
       let lastState = initialState
       let numLoops = 0
       while(numLoops < 10){
-        const nextState = this.props.app(lastState)
+        const nextState = this.app(lastState)
         switch(nextState.type){
           case "render":
             return lastState
@@ -44,6 +50,7 @@ const [appWidget, finalState] = app(C.initialWidgetBuilderState);
             break
           case "suspendAndResume":
             lastState = nextState.effect()
+            this.app = this.getApp(this.props)
             console.log("next state is", lastState)
             break
           case "halt":
@@ -65,7 +72,7 @@ const [appWidget, finalState] = app(C.initialWidgetBuilderState);
     f => () => this.setState(state => this.eventLoop(f(state)))
 
   render(){
-    const output = this.props.app(this.state)
+    const output = this.app(this.state)
 
     return pipe(
       output,
@@ -91,6 +98,16 @@ const [appWidget, finalState] = app(C.initialWidgetBuilderState);
   }
 }
 
+let appModel = 0
+
 export function App(){
-  return <AppRunner app={appWidget} />
+  return <AppRunner getApp={() => {
+    return render(appModel)(newValue => {
+      console.log("STATE UPDATE", newValue)
+      return () => {
+        console.log("STATE UPDATED", newValue)
+        appModel = newValue
+      }
+    })}
+   } />
 }

@@ -36,7 +36,7 @@ export const initialWidgetBuilderState: WidgetBuilderState = {
   currentId: hlist.nil
 }
 
-interface WidgetBuilder extends S.State<WidgetBuilderState, Widget> {}
+export interface WidgetBuilder extends S.State<WidgetBuilderState, Widget> {}
 
 // === WIDGET BUILDER STATE HELPERS ===
 const pushId = (id: string) =>
@@ -131,7 +131,7 @@ export const button: (
           console.log("button is active, triggering effect")
           return N.suspendAndResume(
             pipe(
-              onPress,
+              onPress(),
               I.map(() => ({ ...state, activeIdHasBeenPressedBefore: true }))
             )
           );
