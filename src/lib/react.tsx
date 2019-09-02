@@ -110,9 +110,6 @@ export class AppRunner<A> extends React.Component<
           lastState = nextState.effect();
           this.app = this.getApp(this.props);
           break;
-        case "halt":
-          lastState = nextState.state;
-          break;
       }
       numLoops++;
     }
@@ -136,7 +133,6 @@ export class AppRunner<A> extends React.Component<
       N.fold(
         dsl => <RR.RenderDsl dsl={dsl} dispatch={this.dispatch} />,
         newState => <React.Fragment>continuing...</React.Fragment>,
-        newState => <React.Fragment>halting...</React.Fragment>,
         effect => <React.Fragment>effect...</React.Fragment>
       )
     );

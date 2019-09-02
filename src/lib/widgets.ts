@@ -63,6 +63,10 @@ export const input: (
     const isCurrentlyFocused = C.isCurrentlyFocused(ctx, state);
     const wantsActivation = isCurrentlyFocused;
 
+    if(isCurrentlyActive && state.focusTrap && !isCurrentlyFocused){
+      return N.cont(C.setFocusedId(O.some(ctx.currentId))(state))
+    }
+
     if (
       isCurrentlyActive &&
       !isCurrentlyFocused &&
@@ -120,7 +124,6 @@ export const focusTrap: (
           N.fold(
             dsl => N.render(dsl),
             state => N.cont({ ...state, focusTrap: prevState.focusTrap }),
-            state => N.halt({ ...state, focusTrap: prevState.focusTrap }),
             effect =>
               N.suspendAndResume(
                 pipe(

@@ -4,16 +4,11 @@ import { URIS, Kind } from "fp-ts/lib/HKT";
 export type Next<U extends URIS, S, A> =
   | { type: "render"; dsl: A }
   | { type: "continue"; state: S }
-  | { type: "halt"; state: S }
   | { type: "suspendAndResume"; effect: Kind<U, S> };
 
 export const render: <U extends URIS, A, S>(dsl: A) => Next<U, S, A> = dsl => ({
   type: "render",
   dsl
-});
-export const halt: <U extends URIS, A, S>(state: S) => Next<U, S, A> = state => ({
-  type: "halt",
-  state
 });
 export const cont: <U extends URIS, A, S>(state: S) => Next<U, S, A> = state => ({
   type: "continue",
@@ -26,16 +21,13 @@ export const suspendAndResume: <U extends URIS, A, S>(
 export const fold: <U extends URIS, S, A, B>(
     onRender: (dsl: A) => B,
     onContinue: (state: S) => B,
-    onHalt: (state: S) => B,
     onSuspendAndResume: (effect: Kind<U, S>) => B
-) => (fa: Next<U, S, A>) => B = (onRender, onContinue, onHalt, onResumeAndContinue) => fa => {
+) => (fa: Next<U, S, A>) => B = (onRender, onContinue, onResumeAndContinue) => fa => {
     switch (fa.type) {
       case "render":
         return onRender(fa.dsl);
       case "continue":
         return onContinue(fa.state);
-      case "halt":
-        return onHalt(fa.state);
       case "suspendAndResume":
         return onResumeAndContinue(fa.effect);
     }
@@ -59,8 +51,6 @@ export function reduce<U extends URIS, L, A>(
         case "continue":
           currentState = fa.state;
           break;
-        case "halt":
-          return fa;
         case "suspendAndResume":
           return fa;
       }
