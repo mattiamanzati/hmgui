@@ -1,6 +1,5 @@
-import * as TY from "./types";
-import * as C from "./context";
-import * as D from "./dsl";
+import * as C from "./core/context";
+import * as D from "./core/dsl";
 import { pipe } from "fp-ts/lib/pipeable";
 import * as S from "fp-ts/lib/State";
 import * as A from "fp-ts/lib/Array";
@@ -8,145 +7,178 @@ import * as I from "fp-ts/lib/IO";
 import * as O from "fp-ts/lib/Option";
 import * as N from "./data/next";
 import { identity } from "rxjs";
+import * as W from "./core/widget";
 
-export type MarsWidgetBuilder = TY.WidgetBuilder<
-  "IO",
-  C.WidgetBuilderState,
-  C.WidgetState,
-  D.DSL
->;
-export type MarsWidget = TY.Widget<"IO", C.WidgetState, D.DSL>;
-
-export const tr: (
-  strings: TemplateStringsArray,
-  ...values: string[]
-) => D.TranslableString = (strings, ...values) => ({
-  type: "translable_string",
-  strings,
-  values
-});
+export const tr = D.tr;
 
 export const id: (
   id: string
-) => (widget: MarsWidgetBuilder) => MarsWidgetBuilder = id => widget =>
+) => (widget: W.WidgetBuilder) => W.WidgetBuilder = id => widget =>
   pipe(
     S.modify(C.pushId(id)),
     S.chain(() => widget),
     S.chainFirst(() => S.modify(C.popId()))
   );
 
-export const text: (text: D.TranslableString) => MarsWidgetBuilder = text =>
-  S.gets(ctx => _ => N.render(D.text(ctx.currentId, text)));
+export const text: (text: D.TranslableString) => W.WidgetBuilder = text =>
+  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+    ui: D.text(ctx.currentId, text),
+    tick: _ => s => N.halt()
+  }));
 
-export const container: (
-  ...builders: MarsWidgetBuilder[]
-) => MarsWidgetBuilder = (...builders) =>
+export const button: (
+  text: D.TranslableString,
+  onPress: () => I.IO<void>
+) => W.WidgetBuilder = (text, onPress) =>
+  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+    ui: D.button(ctx.currentId, text),
+    tick: _ => state => {
+      const canActivate = C.canActivate(ctx, state);
+      const isCurrentlyPressed = C.isCurrentlyPressed(ctx, state);
+      const isCurrentlyFocused = C.isCurrentlyFocused(ctx, state);
+      const wasPressedBefore = state.activeIdWasPressedBefore
+      const isCurrentlyActive = C.isCurrentlyActive(ctx, state)
+
+      if (isCurrentlyPressed && !isCurrentlyFocused) {
+        console.log("button: focusing")
+        return N.cont(
+          pipe(
+            state,
+            C.setFocusedId(O.some(ctx.currentId))
+          )
+        );
+      }
+
+      if (canActivate && isCurrentlyFocused && isCurrentlyPressed){
+        console.log("button: activating")
+        return N.cont(pipe(
+          state,
+          C.setActiveId(O.some(ctx.currentId))
+        ))
+      } 
+      
+      if(isCurrentlyActive && !state.activeIdWasPressedBefore) {
+        console.log("button: onPress")
+        return N.suspendAndResume(
+          pipe(
+            onPress(),
+            I.map(_ => pipe(
+              state,
+              C.setActiveIdWasPressedBefore(true)
+            ))
+          )
+        );
+      }
+
+      if(isCurrentlyActive && !isCurrentlyPressed){
+        console.log("button: deactivating")
+        return N.cont(pipe(
+          state,
+          C.setActiveId(O.none)
+        ))
+      }
+
+      return N.halt();
+    }
+  }));
+
+export const container: (...builders: W.WidgetBuilder[]) => W.WidgetBuilder = (
+  ...builders
+) =>
   pipe(
     A.array.sequence(S.state)(builders),
+    S.map(A.sort(W.widget)),
     S.chain(widgets =>
-      S.gets<C.WidgetBuilderState, MarsWidget>(ctx => initialState =>
-        N.reduce(initialState, widgets, dsls =>
-          D.container(ctx.currentId, dsls)
-        )
-      )
+      S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+        ui: D.container(ctx.currentId, widgets.map(w => w.ui)),
+        tick: dsl => initialState =>
+          N.reduce(widgets.map(w => w.tick(w.ui)))(initialState)
+      }))
     )
   );
 
 export const input: (
   value: string,
-  onChange: (newValue: string) => I.IO<void>
-) => MarsWidgetBuilder = (value, onChange) =>
-  S.gets(ctx => state => {
-    const isCurrentlyActive = C.isCurrentlyActive(ctx, state);
-    const canActivate = C.canActivate(ctx, state);
-    const canDeactivate = C.canDeactivate(ctx, state);
-    const isCurrentlyFocused = C.isCurrentlyFocused(ctx, state);
-    const wantsActivation = isCurrentlyFocused;
+  onChange: (newValue: string) => I.IO<void>,
+  enabled: boolean,
+  valid: boolean,
+  isFormatValid: (bufferValue: string) => boolean
+) => W.WidgetBuilder = (value, onChange, enabled, valid, isFormatValid) =>
+  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+    ui: D.input(ctx.currentId, value, enabled),
+    tick: _ => state => {
+      const canActivate = C.canActivate(ctx, state);
+      const isCurrentlyActive = C.isCurrentlyActive(ctx, state);
+      const isCurrentlyFocused = C.isCurrentlyFocused(ctx, state);
+      const canDeactivate = C.canDeactivate(ctx, state);
 
-    if(isCurrentlyActive && state.focusTrap && !isCurrentlyFocused){
-      return N.cont(C.setFocusedId(O.some(ctx.currentId))(state))
-    }
+      // if disabled, forcefully deactivate
+      if (isCurrentlyActive && !enabled) {
+        return N.cont(
+          pipe(
+            state,
+            C.setActiveId(O.some(ctx.currentId))
+          )
+        );
+      }
 
-    if (
-      isCurrentlyActive &&
-      !isCurrentlyFocused &&
-      O.isSome(state.inputBuffer) &&
-      !state.focusTrap
-    ) {
-      return N.suspendAndResume(
-        pipe(
-          onChange(O.getOrElse(() => value)(state.inputBuffer)),
-          I.map(() =>
+      // if enabled, allows logic
+      if (enabled) {
+        if (!isCurrentlyActive && isCurrentlyFocused && canActivate) {
+          // activate the control
+          return N.cont(
             pipe(
               state,
-              C.setInputBuffer(O.none)
+              C.setActiveId(O.some(ctx.currentId))
             )
-          )
-        )
-      );
-    }
-
-    if (wantsActivation && canActivate) {
-      return N.cont(
-        pipe(
-          state,
-          C.setActiveId(O.some(ctx.currentId)),
-          C.setInputBuffer(O.none)
-        )
-      );
-    } else if (!wantsActivation && canDeactivate) {
-      return N.cont(C.setActiveId(O.none)(state));
-    }
-
-    const currentValue = isCurrentlyActive
-      ? O.getOrElse(() => value)(state.inputBuffer)
-      : value;
-
-    return N.render(
-      D.input(
-        ctx.currentId,
-        currentValue,
-        isCurrentlyActive,
-        isCurrentlyFocused
-      )
-    );
-  });
-
-export const focusTrap: (
-  fn: (ctx: C.WidgetBuilderState, state: C.WidgetState) => boolean
-) => (widget: MarsWidgetBuilder) => MarsWidgetBuilder = fn => widget =>
-  pipe(
-    widget,
-    S.chain(widget =>
-      S.gets(ctx => prevState =>
-        pipe(
-          widget({ ...prevState, focusTrap: fn(ctx, prevState) }),
-          N.fold(
-            dsl => N.render(dsl),
-            state => N.cont({ ...state, focusTrap: prevState.focusTrap }),
-            effect =>
-              N.suspendAndResume(
-                pipe(
-                  effect,
-                  I.map(state => ({ ...state, focusTrap: prevState.focusTrap }))
-                )
+          );
+        } else if (isCurrentlyActive && !isCurrentlyFocused && canDeactivate) {
+          // if there is no pending buffer, release the control
+          if (O.isNone(state.inputBuffer) && valid) {
+            return N.cont(
+              pipe(
+                state,
+                C.setActiveId(O.none)
               )
-          )
-        )
-      )
-    )
-  );
+            );
+          }
 
-const isValidInteger = (value: string) => !isNaN(parseInt(value, 10));
+          // check if the format of the buffer is ok
+          const bufferValue = O.getOrElse(() => value)(state.inputBuffer);
+          if (isFormatValid(bufferValue)) {
+            console.log("input: run onChange");
+            return N.suspendAndResume(
+              pipe(
+                onChange(bufferValue),
+                I.map(() => C.setInputBuffer(O.none)(state))
+              )
+            );
+          }
+        }
+      }
+
+      return N.halt();
+    }
+  }));
 
 export const number: (
   value: number,
-  onChange: (newValue: number) => I.IO<void>
-) => MarsWidgetBuilder = (value, onChange) =>
-  pipe(
-    focusTrap(
-      (ctx, state) =>
-        C.isCurrentlyActive(ctx, state) &&
-        !isValidInteger(O.getOrElse(() => value.toFixed(0))(state.inputBuffer))
-    )(input(value.toFixed(0), newValue => onChange(parseInt(newValue, 10))))
+  onChange: (newValue: number) => I.IO<void>,
+  enabled: boolean,
+  valid: boolean
+) => W.WidgetBuilder = (value, onChange, enabled, valid) =>
+  input(
+    value.toFixed(0),
+    newValue => onChange(parseInt(newValue)),
+    enabled,
+    valid,
+    value => !isNaN(parseInt(value))
   );
+
+export const string: (
+  value: string,
+  onChange: (newValue: string) => I.IO<void>,
+  enabled: boolean,
+  valid: boolean
+) => W.WidgetBuilder = (value, onChange, enabled, valid) =>
+  input(value, onChange, enabled, valid, value => true);

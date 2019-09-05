@@ -1,6 +1,6 @@
 import * as W from "./widgets";
-import * as C from "./context";
-import * as dsl from "./dsl";
+import * as C from "./core/context";
+import * as dsl from "./core/dsl";
 import * as hlist from "./data/hlist";
 import * as React from "react";
 import { Observable, Subject, from, BehaviorSubject } from "rxjs";
@@ -23,23 +23,43 @@ function render(model: Model) {
     W.container(
       W.container(
         W.text(W.tr`Età:`),
-        W.id("age")(W.number(model.age, age => update({ ...model, age })))
+        W.id("age")(
+          W.number(
+            model.age,
+            age => update({ ...model, age }),
+            true,
+            model.age > 0
+          )
+        )
       ),
       W.container(
         W.text(W.tr`Nome:`),
-        W.id("name")(W.input(model.name, name => update({ ...model, name })))
+        W.id("name")(
+          W.string(
+            model.name,
+            name => update({ ...model, name }),
+            model.age < 10,
+            model.name.length > 0
+          )
+        )
       ),
       W.container(
         W.text(W.tr`Cognome:`),
         W.id("surname")(
-          W.input(model.surname, surname => update({ ...model, surname }))
+          W.string(
+            model.surname,
+            surname => update({ ...model, surname }),
+            true,
+            model.surname.length > 0
+          )
         )
       ),
       W.text(
         W.tr`Ciao ${model.name} ${
           model.surname
         }, complimenti per i tuoi ${model.age.toFixed(0)} anni!`
-      )
+      ),
+      W.id("button")(W.button(W.tr`Salva`, () => () => console.log(model)))
     );
 }
 

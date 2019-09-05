@@ -1,10 +1,11 @@
 import * as React from "react";
-import * as D from "./dsl";
-import * as C from "./context";
+import * as D from "./core/dsl";
+import * as C from "./core/context";
 import * as I from "fp-ts/lib/IO";
 import * as O from "fp-ts/lib/Option";
 import * as W from "./widgets";
-import * as dsl from "./dsl";
+import * as CW from "./core/widget";
+import * as dsl from "./core/dsl";
 import * as hlist from "./data/hlist";
 import { Observable, Subject, from, BehaviorSubject } from "rxjs";
 import * as rxOp from "rxjs/operators";
@@ -12,6 +13,8 @@ import * as IR from "fp-ts/lib/IORef";
 import * as RR from "./react";
 import * as N from "./data/next";
 import { pipe } from "fp-ts/lib/pipeable";
+
+const StateContext = React.createContext(C.initialWidgetState);
 
 type ComponentProps = {
   dsl: D.DSL;
@@ -25,28 +28,32 @@ function translate(t: D.TranslableString): string {
 
 export const RenderInput = React.memo((props: ComponentProps) => {
   const ref = React.useRef<HTMLInputElement>();
-  React.useEffect(() => {
-    if (
-      ref.current &&
-      props.dsl.type === "input" &&
-      props.dsl.focused &&
-      ref.current !== document.activeElement
-    ) {
-      ref.current.focus();
-    }
-  });
+  // React.useEffect(() => {
+  //   if (
+  //     ref.current &&
+  //     props.dsl.type === "input" &&
+  //     props.dsl.focused &&
+  //     ref.current !== document.activeElement
+  //   ) {
+  //     ref.current.focus();
+  //   }
+  // });
+  const state = React.useContext(StateContext);
   if (props.dsl.type !== "input") return null;
+  const { value } = props.dsl;
+  const isActive = C.isActive(props.dsl.id, state)
+  const rawValue = isActive ? O.getOrElse(() => value)(state.inputBuffer) : value
 
   return (
     <input
       ref={ref as any}
       type="text"
-      value={props.dsl.value}
-      readOnly={!props.dsl.active}
-      onChange={e => props.dispatch(C.setInputBuffer(O.some(e.target.value)))()}
+      disabled={!props.dsl.enabled}
+      value={rawValue}
+      onChange={isActive ? e => props.dispatch(C.setInputBuffer(O.some(e.target.value)))() : undefined}
       onFocus={props.dispatch(C.setFocusedId(O.some(props.dsl.id)))}
       onBlur={props.dispatch(C.setFocusedId(O.none))}
-      style={props.dsl.active ? { border: "3px solid red" } : {}}
+      style={isActive ? { border: "3px solid red"} : {}}
     />
   );
 });
@@ -54,6 +61,14 @@ export const RenderInput = React.memo((props: ComponentProps) => {
 export const RenderText = React.memo((props: ComponentProps) => {
   if (props.dsl.type !== "text") return null;
   return <React.Fragment>{translate(props.dsl.text)}</React.Fragment>;
+});
+
+export const RenderButton = React.memo((props: ComponentProps) => {
+  if (props.dsl.type !== "button") return null;
+  return <button onClick={() => {
+    props.dispatch(C.setPressedId(O.some(props.dsl.id)))()
+    props.dispatch(C.setPressedId(O.none))()
+  }}>{translate(props.dsl.text)}</button>;
 });
 
 export const RenderContainer = React.memo((props: ComponentProps) => {
@@ -75,23 +90,25 @@ export const RenderDsl = React.memo((props: ComponentProps) => {
       return <RenderContainer {...props} />;
     case "text":
       return <RenderText {...props} />;
+    case "button":
+      return <RenderButton {...props} />;
   }
   return <React.Fragment>{JSON.stringify(props.dsl)}</React.Fragment>;
 });
 
 export class AppRunner<A> extends React.Component<
-  { getApp: I.IO<W.MarsWidgetBuilder> },
+  { getApp: I.IO<CW.WidgetBuilder> },
   C.WidgetState
 > {
   state = C.initialWidgetState;
-  app: W.MarsWidget;
+  app: CW.Widget;
 
-  constructor(props: { getApp: I.IO<W.MarsWidgetBuilder> }) {
+  constructor(props: { getApp: I.IO<CW.WidgetBuilder> }) {
     super(props);
     this.app = this.getApp(props);
   }
 
-  getApp(props: { getApp: I.IO<W.MarsWidgetBuilder> }) {
+  getApp(props: { getApp: I.IO<CW.WidgetBuilder> }) {
     return props.getApp()(C.initialWidgetBuilderState)[0];
   }
 
@@ -99,9 +116,11 @@ export class AppRunner<A> extends React.Component<
     let lastState = initialState;
     let numLoops = 0;
     while (numLoops < 10) {
-      const nextState = this.app(lastState);
+      console.log(lastState)
+      const nextState = this.app.tick(this.app.ui)(lastState);
+      console.log(nextState);
       switch (nextState.type) {
-        case "render":
+        case "halt":
           return lastState;
         case "continue":
           lastState = nextState.state;
@@ -126,15 +145,10 @@ export class AppRunner<A> extends React.Component<
   ) => I.IO<void> = f => () => this.setState(state => this.eventLoop(f(state)));
 
   render() {
-    const output = this.app(this.state);
-
-    return pipe(
-      output,
-      N.fold(
-        dsl => <RR.RenderDsl dsl={dsl} dispatch={this.dispatch} />,
-        newState => <React.Fragment>continuing...</React.Fragment>,
-        effect => <React.Fragment>effect...</React.Fragment>
-      )
+    return (
+      <StateContext.Provider value={this.state}>
+        <RR.RenderDsl dsl={this.app.ui} dispatch={this.dispatch} />
+      </StateContext.Provider>
     );
   }
 }

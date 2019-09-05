@@ -1,62 +1,53 @@
 import * as I from "fp-ts/lib/IO";
 import { URIS, Kind } from "fp-ts/lib/HKT";
 
-export type Next<U extends URIS, S, A> =
-  | { type: "render"; dsl: A }
-  | { type: "continue"; state: S }
-  | { type: "suspendAndResume"; effect: Kind<U, S> };
+export type Next<U extends URIS, A> =
+  | { type: "halt"}
+  | { type: "continue"; state: A }
+  | { type: "suspendAndResume"; effect: Kind<U, A> };
 
-export const render: <U extends URIS, A, S>(dsl: A) => Next<U, S, A> = dsl => ({
-  type: "render",
-  dsl
+export const halt: <U extends URIS, A>() => Next<U, A> = () => ({
+  type: "halt"
 });
-export const cont: <U extends URIS, A, S>(state: S) => Next<U, S, A> = state => ({
+export const cont: <U extends URIS, A>(state: A) => Next<U, A> = state => ({
   type: "continue",
   state
 });
-export const suspendAndResume: <U extends URIS, A, S>(
-  effect: Kind<U, S>
-) => Next<U, S, A> = effect => ({ type: "suspendAndResume", effect });
+export const suspendAndResume: <U extends URIS, A>(
+  effect: Kind<U, A>
+) => Next<U, A> = effect => ({ type: "suspendAndResume", effect });
 
-export const fold: <U extends URIS, S, A, B>(
-    onRender: (dsl: A) => B,
-    onContinue: (state: S) => B,
-    onSuspendAndResume: (effect: Kind<U, S>) => B
-) => (fa: Next<U, S, A>) => B = (onRender, onContinue, onResumeAndContinue) => fa => {
+export const fold: <U extends URIS, A, B>(
+    onContinue: (state: A) => B,
+    onSuspendAndResume: (effect: Kind<U, A>) => B,
+    onHalt: () => B
+) => (fa: Next<U, A>) => B = (onContinue, onResumeAndContinue, onHalt) => fa => {
     switch (fa.type) {
-      case "render":
-        return onRender(fa.dsl);
       case "continue":
         return onContinue(fa.state);
       case "suspendAndResume":
         return onResumeAndContinue(fa.effect);
+      case "halt":
+        return onHalt()
     }
 }
 
-// TODO: I don't know exactly, but this seems like a job a foldable instance would love to do.
-export function reduce<U extends URIS, L, A>(
-    initialState: L,
-    fas: ((l: L) => Next<U, L, A>)[],
-    agglomerate: (a: A[]) => A
-  ): Next<U, L, A> {
-    let currentState = initialState;
-    let currentIndex = 0;
-    let outDsl: any[] = [];
-    while (currentIndex < fas.length) {
-      const fa = fas[currentIndex](currentState);
-      switch (fa.type) {
-        case "render":
-          outDsl.push(fa.dsl);
-          break;
-        case "continue":
-          currentState = fa.state;
-          break;
-        case "suspendAndResume":
-          return fa;
+export const reduce: <U extends URIS, A>(items: ((state: A) => Next<U, A>)[]) => (initialState: A) => Next<U, A> = 
+    transforms => initialState => {
+      let currentState = initialState
+      let currentIndex = 0
+      while(transforms.length > currentIndex){
+        const proposedState = transforms[currentIndex](currentState)
+        switch(proposedState.type){
+          case "halt":
+            break
+          case "continue":
+            currentState = proposedState.state
+            break
+          case "suspendAndResume":
+            return proposedState
+        }
+        currentIndex++
       }
-      currentIndex++;
+      return currentState !== initialState ? cont(currentState) : halt()
     }
-    if (outDsl.length !== fas.length) return cont(currentState);
-    return render(agglomerate(outDsl));
-  }
-  
