@@ -1,28 +1,39 @@
 import * as hlist from "../data/hlist";
 import * as O from "fp-ts/lib/Option";
+import { pipe } from "fp-ts/lib/pipeable";
 
 export type ID = hlist.HList<string>;
 
 export interface WidgetBuilderState {
   currentId: ID;
+  label: O.Option<string>
+  enabled: boolean
 }
 export const initialWidgetBuilderState: WidgetBuilderState = {
-  currentId: hlist.nil
+  currentId: hlist.nil,
+  label: O.none,
+  enabled: true
 };
 
 export interface WidgetState {
   pressedId: O.Option<ID>; // ID of the widget being pressed
   focusedId: O.Option<ID>; // ID of the widget which has currently focus, may be different from the active one.
+  autoFocus: boolean      // first focusable widget will acquire focus
+
   activeId: O.Option<ID>; // ID of the widget which is currently active, meaning that edit can occur
+  activeIdIsAlive: O.Option<ID> // tracks if the active ID is actually interactive, if not, application will forcefully blur away.
   activeIdWasPressedBefore: boolean;
   inputBuffer: O.Option<string>;
 }
 export const initialWidgetState: WidgetState = {
   activeId: O.none,
+  activeIdIsAlive: O.none,
+  activeIdWasPressedBefore: false,
+
   pressedId: O.none,
   focusedId: O.none,
   inputBuffer: O.none,
-  activeIdWasPressedBefore: false
+  autoFocus: true
 };
 
 export const pushId: (
@@ -37,6 +48,26 @@ export const popId: () => (
   ...ctx,
   currentId: hlist.pop(ctx.currentId)
 });
+export const getEnabled: (
+  ctx: WidgetBuilderState
+) => boolean = ctx => ctx.enabled
+export const setEnabled: (enabled: boolean) => (
+  ctx: WidgetBuilderState
+) => WidgetBuilderState = (enabled) => ctx => ({
+  ...ctx,
+  enabled
+});
+
+export function newFrame(state: WidgetState): WidgetState {
+  return pipe(
+    state,
+    setActiveIdIsAlive(O.none)
+  )
+}
+
+export function isActiveIdStale(state: WidgetState): boolean {
+  return O.isSome(state.activeId) && O.isSome(state.activeIdIsAlive) && !optionHList.equals(state.activeId, state.activeIdIsAlive)
+}
 
 export function setActiveId(
   activeId: O.Option<ID>
@@ -44,13 +75,20 @@ export function setActiveId(
   return state => ({
     ...state,
     activeId,
-    inputBuffer: optionHList.equals(activeId, state.activeId)
-      ? state.inputBuffer
-      : O.none,
+    activeIdIsAlive: activeId,
     activeIdWasPressedBefore: optionHList.equals(activeId, state.activeId)
       ? state.activeIdWasPressedBefore
-      : false
+      : false,
+    inputBuffer: optionHList.equals(activeId, state.activeId)
+      ? state.inputBuffer
+      : O.none
   });
+}
+
+export function setActiveIdIsAlive(
+  activeIdIsAlive: O.Option<ID>
+): (state: WidgetState) => WidgetState {
+  return state => ({ ...state, activeIdIsAlive })
 }
 
 export function setActiveIdWasPressedBefore(activeIdWasPressedBefore: boolean): (state: WidgetState) => WidgetState{
@@ -67,6 +105,9 @@ export function setFocusedId(
 ): (state: WidgetState) => WidgetState {
   return state => ({ ...state, focusedId });
 }
+export function setAutoFocus(autoFocus: boolean): (state: WidgetState) => WidgetState{
+  return state => ({ ...state, autoFocus })
+}
 export function setInputBuffer(
   inputBuffer: O.Option<string>
 ): (state: WidgetState) => WidgetState {
@@ -77,6 +118,9 @@ const optionHList = O.getEq(hlist);
 
 export function isActive(id: ID, state: WidgetState) {
   return optionHList.equals(O.some(id), state.activeId);
+}
+export function isFocused(id: ID, state: WidgetState) {
+  return optionHList.equals(O.some(id), state.focusedId);
 }
 
 export function isCurrentlyActive(

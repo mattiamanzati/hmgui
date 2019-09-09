@@ -1,4 +1,3 @@
-import * as S from "fp-ts/lib/State";
 import * as hlist from "../data/hlist";
 
 export type TranslableString = {

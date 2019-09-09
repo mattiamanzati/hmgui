@@ -1,73 +1,49 @@
 import * as W from "./widgets";
-import * as C from "./core/context";
-import * as dsl from "./core/dsl";
-import * as hlist from "./data/hlist";
+import * as A from "./attributes";
 import * as React from "react";
-import { Observable, Subject, from, BehaviorSubject } from "rxjs";
-import * as rxOp from "rxjs/operators";
 import * as I from "fp-ts/lib/IO";
-import * as IR from "fp-ts/lib/IORef";
-import * as O from "fp-ts/lib/Option";
-import * as RR from "./react";
-import * as N from "./data/next";
+import * as RR from "./react/renderer";
 import { pipe } from "fp-ts/lib/pipeable";
 
-type Model = {
-  name: string;
-  surname: string;
-  age: number;
-};
+type Model = string[];
+
+let spamTest: string[] = [];
+for (let i = 0; i < 1000; i++) {
+  spamTest.push("" + i);
+}
 
 function render(model: Model) {
   return (update: (newModel: Model) => I.IO<void>) =>
     W.container(
-      W.container(
-        W.text(W.tr`Età:`),
-        W.id("age")(
-          W.number(
-            model.age,
-            age => update({ ...model, age }),
-            true,
-            model.age > 0
-          )
+      spamTest.map((_, i) =>
+        pipe(
+          W.container([
+            pipe(
+              W.text(W.tr`Counter ${"" + i}:`),
+              A.id("label" + i)
+            ),
+            pipe(
+              W.string(
+                model[i],
+                name =>
+                  update(
+                    model
+                      .slice(0, i)
+                      .concat([name])
+                      .concat(model.slice(i + 1))
+                  ),
+                true
+              ),
+              A.id("name" + i)
+            )
+          ]),
+          A.id("div" + i)
         )
-      ),
-      W.container(
-        W.text(W.tr`Nome:`),
-        W.id("name")(
-          W.string(
-            model.name,
-            name => update({ ...model, name }),
-            model.age < 10,
-            model.name.length > 0
-          )
-        )
-      ),
-      W.container(
-        W.text(W.tr`Cognome:`),
-        W.id("surname")(
-          W.string(
-            model.surname,
-            surname => update({ ...model, surname }),
-            true,
-            model.surname.length > 0
-          )
-        )
-      ),
-      W.text(
-        W.tr`Ciao ${model.name} ${
-          model.surname
-        }, complimenti per i tuoi ${model.age.toFixed(0)} anni!`
-      ),
-      W.id("button")(W.button(W.tr`Salva`, () => () => console.log(model)))
+      )
     );
 }
 
-let appModel: Model = {
-  name: "",
-  surname: "",
-  age: 0
-};
+let appModel: Model = spamTest;
 
 export function App() {
   return (

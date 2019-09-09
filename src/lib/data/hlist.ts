@@ -34,6 +34,9 @@ export function equals<A>(a: HList<A>, b: HList<A>) {
         } else {
           return false;
         }
+        break;
+      default:
+        throw Error("WTF!");
     }
   }
 }
@@ -52,4 +55,10 @@ export const toArray = <A>(list: HList<A>): Array<A> => {
     l = l.prev;
   }
   return r;
+};
+
+export const toString = <A>(list: HList<A>): string => {
+  return toArray(list)
+    .map(f => "" + f)
+    .join("/");
 };

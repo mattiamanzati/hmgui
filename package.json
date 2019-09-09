@@ -8,9 +8,11 @@
     "@types/react": "16.8.15",
     "@types/react-dom": "16.8.4",
     "fp-ts": "^2.0.1",
+    "memoizee": "^0.4.14",
     "proxy-state-tree": "^4.4.1",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
+    "react-native-web": "^0.11.7",
     "react-scripts": "3.0.0",
     "rxjs": "^6.5.2",
     "typescript": "3.4.5",
@@ -37,5 +39,8 @@
       "last 1 safari version"
     ]
   },
-  "homepage": "https://mattiamanzati.github.io/hmgui/build/"
+  "devDependencies": {
+    "@types/memoizee": "^0.4.2",
+    "@types/react-native": "^0.60.11"
+  }
 }
