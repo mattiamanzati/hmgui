@@ -8,7 +8,7 @@ import { pipe } from "fp-ts/lib/pipeable";
 type Model = string[];
 
 let spamTest: string[] = [];
-for (let i = 0; i < 1000; i++) {
+for (let i = 0; i < 300; i++) {
   spamTest.push("" + i);
 }
 

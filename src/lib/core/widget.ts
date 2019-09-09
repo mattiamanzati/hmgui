@@ -1,4 +1,4 @@
-import * as S from "fp-ts/lib/State";
+import * as R from "fp-ts/lib/Reader";
 import * as C from "./context";
 import * as D from "./dsl";
 import * as O from "fp-ts/lib/Ord";
@@ -11,9 +11,11 @@ export interface Widget {
   tick: (dsl: D.DSL) => (state: C.WidgetState) => N.Next<"IO", C.WidgetState>;
 }
 
-export interface WidgetBuilder extends S.State<C.WidgetBuilderState, Widget> {}
+export interface WidgetBuilder extends R.Reader<C.WidgetBuilderState, Widget> {}
 
 export const widget: O.Ord<Widget> = {
   equals: (a, b) => H.equals(a.ui.id, b.ui.id),
   compare: (a, b) => 0
 };
+
+export const noEventHandler: (dsl: D.DSL) => (state: C.WidgetState) => N.Next<"IO", C.WidgetState> = _ => _ => N.halt()

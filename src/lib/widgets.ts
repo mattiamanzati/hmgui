@@ -1,29 +1,26 @@
 import * as C from "./core/context";
 import * as D from "./core/dsl";
 import { pipe } from "fp-ts/lib/pipeable";
-import * as S from "fp-ts/lib/State";
+import * as R from "fp-ts/lib/Reader";
 import * as A from "fp-ts/lib/Array";
 import * as I from "fp-ts/lib/IO";
 import * as O from "fp-ts/lib/Option";
 import * as N from "./data/next";
 import * as W from "./core/widget";
 
-const immutableWidget = (_: D.DSL) => (s: C.WidgetState) =>
-  N.halt<"IO", C.WidgetState>();
-
 export const tr = D.tr;
 
 export const text: (text: D.TranslableString) => W.WidgetBuilder = text =>
-  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+  R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
     ui: D.text(ctx.currentId, text),
-    tick: immutableWidget
+    tick: W.noEventHandler
   }));
 
 export const button: (
   text: D.TranslableString,
   onPress: () => I.IO<void>
 ) => W.WidgetBuilder = (text, onPress) =>
-  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+  R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
     ui: D.button(ctx.currentId, text),
     tick: _ => state => {
       const canActivate = C.canActivate(ctx, state);
@@ -89,10 +86,10 @@ export const container: (builders: W.WidgetBuilder[]) => W.WidgetBuilder = ((
   builders
 ) =>
   pipe(
-    A.array.sequence(S.state)(builders),
-    S.map(A.sort(W.widget)),
-    S.chain(widgets =>
-      S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+    A.array.sequence(R.reader)(builders),
+    R.map(A.sort(W.widget)),
+    R.chain(widgets =>
+      R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
         ui: D.container(ctx.currentId, widgets.map(w => w.ui)),
         tick: handleContainerEvents(widgets)(ctx)
       }))
@@ -170,7 +167,7 @@ export const input: (
   valid: boolean,
   isFormatValid: (bufferValue: string) => boolean
 ) => W.WidgetBuilder = (value, onChange, valid, isFormatValid) =>
-  S.gets<C.WidgetBuilderState, W.Widget>(ctx => ({
+  R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
     ui: D.input(ctx.currentId, value, C.getEnabled(ctx)),
     tick: handleInputEvents(value, onChange, valid, isFormatValid)(ctx)
   }));

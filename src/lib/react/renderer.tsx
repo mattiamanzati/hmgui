@@ -186,7 +186,7 @@ export class AppRunner<A> extends React.Component<
     console.log("generating DSL took " + timeTaken + "ms")
 
     const startedAt2 = new Date().getTime()
-    const app = builtApp(C.initialWidgetBuilderState)[0]
+    const app = builtApp(C.initialWidgetBuilderState)
     const timeTaken2 = new Date().getTime() - startedAt2
     console.log("building DSL took " + timeTaken2 + "ms")
 
@@ -194,6 +194,9 @@ export class AppRunner<A> extends React.Component<
   }
 
   eventLoop: (initialState: C.WidgetState) => C.WidgetState = initialState => {
+    // time tracking
+    const startedAt = new Date().getTime()
+
     // each frame, we debate if the active element is actually alive
     let currentState = C.newFrame(initialState);
     let keepAlive = true;
@@ -239,6 +242,10 @@ export class AppRunner<A> extends React.Component<
         }
       }
     }
+    // render
+    const timeTaken = new Date().getTime() - startedAt
+    console.log("event loop took " + timeTaken + "ms")
+
     // logs processed frames
     console.log(frameProcessed + " frames processed")
     return currentState;
