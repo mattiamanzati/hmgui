@@ -19,7 +19,7 @@ import {
 } from "native-base";
 import * as RX from "rxjs";
 import { pipe } from "fp-ts/lib/pipeable";
-import { TextInput, KeyboardAvoidingView, FlatList, TouchableWithoutFeedback, TouchableOpacity } from "react-native";
+import { TextInput, KeyboardAvoidingView, FlatList, TouchableWithoutFeedback, TouchableOpacity, ListRenderItemInfo } from "react-native";
 
 const StateContext = React.createContext(RX.of(C.initialWidgetState));
 
@@ -98,10 +98,7 @@ function useDslState(props: ComponentProps) {
     isFocused
   ]);
   const onBlur = React.useMemo(
-    () => () => {
-      console.log("ABOUT TO BLUR ", idSerialized);
-      return dispatch(C.doBlur(id))();
-    },
+    () => dispatch(C.doBlur(id)),
     [dispatch, idSerialized, isFocused]
   );
 
@@ -171,7 +168,7 @@ export const RenderInput = React.memo(function InputRenderer(
   if (props.dsl.type !== "input") return null;
 
   return (
-    <Item underline error={inputBufferState === "invalid"} onPress={onFocus}>
+    <Item underline error={inputBufferState === "invalid"} onPress={!isFocused ? onFocus : undefined}>
       <Input
         ref={c => {
           ref.current = c ? (c as any)._root : null;
@@ -184,7 +181,7 @@ export const RenderInput = React.memo(function InputRenderer(
         selectTextOnFocus={true}
         onSubmitEditing={onTabNext}
         blurOnSubmit={false}
-        pointerEvents="none"
+        pointerEvents={!isFocused ? "none" : "auto"}
       />
       {isActive ? <Icon name="create" onPress={onFocus} /> : null}
       {isFocused ? <Icon name="arrow-dropleft" /> : null}
@@ -224,23 +221,25 @@ export const RenderContainer = React.memo(function ContainerRenderer(
 ) {
   if (props.dsl.type !== "container") return null;
   return (
-    <View key={hlist.toString(props.dsl.id)} style={{flex: 1}}>
+    <View key={hlist.toString(props.dsl.id)}>
       {props.dsl.children.map((dsl, i) => render({ ...props, dsl }))}
     </View>
   );
 });
 RenderContainer.displayName = "DSL(Container)";
 
+const keyExtractor: (d: D.DSL) => string = d => hlist.toString(d.id)
 export const RenderList = React.memo(function ListRenderer(
   props: ComponentProps
 ) {
+  const { update, dispatch} = props
+  const renderItem = React.useMemo(() => (d: ListRenderItemInfo<D.DSL>) => render({ update, dispatch, dsl: d.item}), [update, dispatch])
   if (props.dsl.type !== "list") return null;
   return (
     <FlatList
       data={props.dsl.children}
-      keyExtractor={d => hlist.toString(d.id)}
-      renderItem={d => render({ ...props, dsl: d.item })}
-      style={{flex: 1}}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
     />
   );
 });
