@@ -19,7 +19,17 @@ import {
 } from "native-base";
 import * as RX from "rxjs";
 import { pipe } from "fp-ts/lib/pipeable";
-import { TextInput, KeyboardAvoidingView, FlatList, TouchableWithoutFeedback, TouchableOpacity, ListRenderItemInfo } from "react-native";
+import {
+  TextInput,
+  KeyboardAvoidingView,
+  FlatList,
+  TouchableWithoutFeedback,
+  TouchableOpacity,
+  ListRenderItemInfo,
+  NativeSyntheticEvent,
+  TextInputKeyPressEventData
+} from "react-native";
+import { dispatch } from "rxjs/internal/observable/range";
 
 const StateContext = React.createContext(RX.of(C.initialWidgetState));
 
@@ -84,23 +94,29 @@ function useDslState(props: ComponentProps) {
   );
 
   const inputBufferState$ = React.useMemo(
-    () => state$.pipe(rxOp.map(state => C.isActive(id, state) ? state.inputBufferState : "valid")),
+    () =>
+      state$.pipe(
+        rxOp.map(state =>
+          C.isActive(id, state) ? state.inputBufferState : "valid"
+        )
+      ),
     [state$, idSerialized]
-  )
+  );
 
   const isActive = useObservable(isActive$, false);
   const isFocused = useObservable(isFocused$, false);
-  const inputBufferState = useObservable(inputBufferState$, "valid")
+  const inputBufferState = useObservable(inputBufferState$, "valid");
 
   const onFocus = React.useMemo(() => dispatch(C.doFocus(id)), [
     dispatch,
     idSerialized,
     isFocused
   ]);
-  const onBlur = React.useMemo(
-    () => dispatch(C.doBlur(id)),
-    [dispatch, idSerialized, isFocused]
-  );
+  const onBlur = React.useMemo(() => dispatch(C.doBlur(id)), [
+    dispatch,
+    idSerialized,
+    isFocused
+  ]);
 
   const onChangeText = React.useMemo(
     () => (newText: string) =>
@@ -109,7 +125,7 @@ function useDslState(props: ComponentProps) {
   );
 
   const onTabNext = React.useMemo(
-    () => (isFocused ? dispatch(C.setRequestedFocusNext(O.some(id))) : noop),
+    () => dispatch(C.setRequestedFocusNext(O.some(id))),
     [idSerialized, update, isFocused]
   );
 
@@ -158,17 +174,32 @@ export const RenderInput = React.memo(function InputRenderer(
   const rawValue = useObservable(rawValue$, value);
 
   React.useEffect(() => {
-    if(ref.current && isFocused && !ref.current.isFocused()){
-      ref.current.focus()
-    }else if(ref.current && !isFocused && ref.current.isFocused()){
-      ref.current.blur()
+    if (ref.current && isFocused && !ref.current.isFocused()) {
+      ref.current.focus();
+    } else if (ref.current && !isFocused && ref.current.isFocused()) {
+      ref.current.blur();
     }
   });
+
+  const onKeyPress = React.useMemo(
+    () => (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        if(e.nativeEvent.key === "Tab"){
+          console.log("tabbing")
+          onTabNext()
+          e.preventDefault()
+        }
+    },
+    [idSerialized, dispatch]
+  );
 
   if (props.dsl.type !== "input") return null;
 
   return (
-    <Item underline error={inputBufferState === "invalid"} onPress={!isFocused ? onFocus : undefined}>
+    <Item
+      underline
+      error={inputBufferState === "invalid"}
+      onPress={!isFocused ? onFocus : undefined}
+    >
       <Input
         ref={c => {
           ref.current = c ? (c as any)._root : null;
@@ -182,6 +213,7 @@ export const RenderInput = React.memo(function InputRenderer(
         onSubmitEditing={onTabNext}
         blurOnSubmit={false}
         pointerEvents={!isFocused ? "none" : "auto"}
+        onKeyPress={onKeyPress}
       />
       {isActive ? <Icon name="create" onPress={onFocus} /> : null}
       {isFocused ? <Icon name="arrow-dropleft" /> : null}
@@ -228,12 +260,16 @@ export const RenderContainer = React.memo(function ContainerRenderer(
 });
 RenderContainer.displayName = "DSL(Container)";
 
-const keyExtractor: (d: D.DSL) => string = d => hlist.toString(d.id)
+const keyExtractor: (d: D.DSL) => string = d => hlist.toString(d.id);
 export const RenderList = React.memo(function ListRenderer(
   props: ComponentProps
 ) {
-  const { update, dispatch} = props
-  const renderItem = React.useMemo(() => (d: ListRenderItemInfo<D.DSL>) => render({ update, dispatch, dsl: d.item}), [update, dispatch])
+  const { update, dispatch } = props;
+  const renderItem = React.useMemo(
+    () => (d: ListRenderItemInfo<D.DSL>) =>
+      render({ update, dispatch, dsl: d.item }),
+    [update, dispatch]
+  );
   if (props.dsl.type !== "list") return null;
   return (
     <FlatList
@@ -364,11 +400,11 @@ export class AppRunner<A> extends React.Component<
   render() {
     return (
       <StateContext.Provider value={this.state$}>
-              <RenderDsl
-                dsl={this.state.dsl}
-                dispatch={this.dispatch}
-                update={this.update}
-              />
+        <RenderDsl
+          dsl={this.state.dsl}
+          dispatch={this.dispatch}
+          update={this.update}
+        />
       </StateContext.Provider>
     );
   }
