@@ -23,6 +23,7 @@ export type DSL =
   | { type: "text"; id: ID; text: TranslableString }
   | { type: "button"; id: ID; text: TranslableString }
   | { type: "container"; id: ID; children: DSL[] }
+  | { type: "list"; id: ID; children: DSL[] }
   | { type: "input"; id: ID; value: string ; enabled: boolean};
 
 export const text: (id: ID, text: TranslableString) => DSL = (id, text) => ({
@@ -32,6 +33,11 @@ export const text: (id: ID, text: TranslableString) => DSL = (id, text) => ({
 });
 export const container: (id: ID, children: DSL[]) => DSL = (id, children) => ({
   type: "container",
+  id,
+  children
+});
+export const list: (id: ID, children: DSL[]) => DSL = (id, children) => ({
+  type: "list",
   id,
   children
 });

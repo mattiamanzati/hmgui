@@ -1,7 +1,7 @@
-import * as C from "./core/context";
+import * as C from "./context";
 import { pipe } from "fp-ts/lib/pipeable";
 import * as R from "fp-ts/lib/Reader";
-import * as W from "./core/widget";
+import * as W from "./widget";
 
 export const id: (
   id: string

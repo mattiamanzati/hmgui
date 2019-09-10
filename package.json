@@ -1,46 +1,28 @@
 {
-  "name": "hmgui",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@types/jest": "24.0.12",
-    "@types/node": "11.13.8",
-    "@types/react": "16.8.15",
-    "@types/react-dom": "16.8.4",
-    "fp-ts": "^2.0.1",
-    "memoizee": "^0.4.14",
-    "proxy-state-tree": "^4.4.1",
-    "react": "^16.8.6",
-    "react-dom": "^16.8.6",
-    "react-native-web": "^0.11.7",
-    "react-scripts": "3.0.0",
-    "rxjs": "^6.5.2",
-    "typescript": "3.4.5",
-    "why-did-you-update": "0.1.1"
-  },
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "eject": "expo eject"
   },
-  "eslintConfig": {
-    "extends": "react-app"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "dependencies": {
+    "expo": "^34.0.1",
+    "expo-font": "^6.0.1",
+    "fp-ts": "^2.0.5",
+    "native-base": "^2.13.7",
+    "react": "16.8.3",
+    "react-dom": "^16.8.6",
+    "react-native": "https://github.com/expo/react-native/archive/sdk-34.0.0.tar.gz",
+    "react-native-web": "^0.11.4",
+    "rxjs": "^6.5.3"
   },
   "devDependencies": {
-    "@types/memoizee": "^0.4.2",
-    "@types/react-native": "^0.60.11"
-  }
+    "@types/react": "^16.8.23",
+    "@types/react-native": "^0.57.65",
+    "babel-preset-expo": "^6.0.0",
+    "typescript": "^3.4.5"
+  },
+  "private": true
 }
