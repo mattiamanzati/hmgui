@@ -2,19 +2,23 @@ import * as React from "react";
 import {
   TextInput,
   NativeSyntheticEvent,
-  TextInputKeyPressEventData
+  TextInputKeyPressEventData,
+  Alert,
+  TouchableWithoutFeedback
 } from "react-native";
-import { Input, Item, Icon, Label } from "native-base";
+import { Input, Item, Icon, Label, Button } from "native-base";
 import * as rxOp from "rxjs/operators";
 import * as O from "fp-ts/lib/Option";
 import * as hlist from "../data/hlist";
 import * as C from "../core/context";
+import * as D from "../core/dsl";
 import {
   ComponentProps,
   useDslState,
   useObservable,
   useWidgetState,
-  translate
+  translate,
+  useDslValue
 } from "./common";
 
 export const RenderInput = React.memo(function InputRenderer(
@@ -29,9 +33,10 @@ export const RenderInput = React.memo(function InputRenderer(
     onTabNext,
     inputBufferState
   } = useDslState(props);
+  const id = useDslValue<D.ID>(D.lens.id, hlist.nil, hlist)
+  const text = useDslValue(D.lens.text, D.tr`Label`, D.eqTr)
+  const value = useDslValue(D.lens.value, '')
   const state$ = useWidgetState();
-  const { id } = props.dsl;
-  const value = (props.dsl as any).value || "";
   const idSerialized = hlist.toString(id);
 
   const ref = React.useRef<TextInput>();
@@ -68,15 +73,13 @@ export const RenderInput = React.memo(function InputRenderer(
     [idSerialized]
   );
 
-  if (props.dsl.type !== "input") return null;
-
   return (
     <Item
       underline
       error={inputBufferState === "invalid"}
-      onPress={!isFocused ? onFocus : undefined}
+      onPress={!isFocused && !isActive ? onFocus : undefined}
     >
-      <Label>{translate(props.dsl.text)}</Label>
+      <Label>{translate(text)}</Label>
       <Input
         ref={c => {
           ref.current = c ? (c as any)._root /* NativeBase uses this */ : null;
@@ -94,6 +97,7 @@ export const RenderInput = React.memo(function InputRenderer(
       />
       {isActive ? <Icon name="create" onPress={onFocus} /> : null}
       {isFocused ? <Icon name="arrow-dropleft" /> : null}
+      <Button small transparent={true} onPress={() => console.log("LOL")}><Icon name="search" /></Button>
     </Item>
   );
 });

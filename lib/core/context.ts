@@ -206,5 +206,8 @@ export function doFocus(id: ID): (state: WidgetState) => WidgetState {
   }
 }
 export function doUpdateInputBuffer(id: ID, buffer: O.Option<string>): (state: WidgetState) => WidgetState {
-  return state => isActive(id, state) && isFocused(id, state) ? setInputBuffer(buffer)(state) : state
+  return state => {
+    console.log("-EVENT: doUpdateInputBuffer " + hlist.toString(id))
+    return isActive(id, state) && isFocused(id, state) ? setInputBuffer(buffer)(state) : state
+  }
 }

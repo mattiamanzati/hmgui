@@ -8,14 +8,18 @@ import { pipe } from "fp-ts/lib/pipeable";
 type Model = number[];
 
 let spamTest: number[] = [];
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < 10; i++) {
   spamTest.push(i);
 }
 
 let strings: string[] = [];
-for (let i = 0; i < 200; i++) {
+for (let i = 0; i < 5; i++) {
   strings.push("Test " + i);
 }
+
+const longList = A.id("list")(
+  W.list(strings.map(s => A.id(s)(W.container([W.text(W.tr`${s}`)]))))
+)
 
 function render(model: Model) {
   return (update: (newModel: Model) => I.IO<void>) =>
@@ -54,10 +58,16 @@ function render(model: Model) {
             ])
         )
       ),
-      A.id("list")(
-        W.list(strings.map(s => A.id(s)(W.container([W.text(W.tr`${s}`)]))))
-      )
+      longList
     ]);
+}
+
+
+function render3(model: Model) {
+  return (update: (newModel: Model) => I.IO<void>) => W.list([
+    pipe(W.text(W.tr`Hello`), A.id("a")),
+    pipe(W.text(W.tr`World`), A.id("b"))
+  ])
 }
 
 let appModel: Model = spamTest;
@@ -67,9 +77,9 @@ export function App() {
     <RR.AppRunner
       getApp={() => {
         return render(appModel)(newValue => {
-          console.log("STATE UPDATE", newValue);
+          //console.log("STATE UPDATE", newValue);
           return () => {
-            console.log("STATE UPDATED", newValue);
+            //console.log("STATE UPDATED", newValue);
             appModel = newValue;
           };
         });

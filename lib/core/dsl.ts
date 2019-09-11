@@ -1,4 +1,6 @@
 import * as hlist from "../data/hlist";
+import * as EQ from "fp-ts/lib/Eq"
+import * as A from "fp-ts/lib/Array"
 
 export type TranslableString = {
   type: "translable_string";
@@ -14,6 +16,12 @@ export const tr: (
   strings,
   values
 });
+
+const arrayStringEq = A.getEq(EQ.eqString)
+export const eqTr: EQ.Eq<TranslableString> = EQ.getStructEq({
+  strings: arrayStringEq,
+  values: arrayStringEq
+}) as any
 
 export type ID = hlist.HList<string>;
 
@@ -52,3 +60,10 @@ export const input: (id: ID, text: TranslableString, value: string, enabled: boo
   value,
   enabled
 ) => ({ type: "input", id, text, value, enabled });
+
+export const lens = {
+  type: (d: DSL) => (d as any).type,
+  id: (d: DSL) => d.id,
+  text: (d: DSL) => (d as any).text || tr``,
+  value: (d: DSL) => (d as any).value || undefined as any
+}
