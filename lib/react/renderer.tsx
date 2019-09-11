@@ -7,37 +7,19 @@ import * as CW from "../core/widget";
 import * as hlist from "../data/hlist";
 import * as N from "../data/next";
 import * as rxOp from "rxjs/operators";
-import {
-  Text,
-  Button,
-  Input,
-  Container,
-  Content,
-  Item,
-  Icon,
-  View
-} from "native-base";
+import { Text, Button, View } from "native-base";
 import * as RX from "rxjs";
 import { pipe } from "fp-ts/lib/pipeable";
+import { FlatList, ListRenderItemInfo } from "react-native";
 import {
-  TextInput,
-  KeyboardAvoidingView,
-  FlatList,
-  TouchableWithoutFeedback,
-  TouchableOpacity,
-  ListRenderItemInfo,
-  NativeSyntheticEvent,
-  TextInputKeyPressEventData
-} from "react-native";
-import { dispatch } from "rxjs/internal/observable/range";
-
-const StateContext = React.createContext(RX.of(C.initialWidgetState));
-
-type ComponentProps = {
-  dsl: D.DSL;
-  dispatch: (f: (state: C.WidgetState) => C.WidgetState) => I.IO<void>;
-  update: (f: (state: C.WidgetState) => C.WidgetState) => I.IO<void>;
-};
+  ComponentProps,
+  translate,
+  StateContext,
+  useWidgetState,
+  useDslState
+} from "./common";
+import { RenderInput } from "./input";
+import { RenderText } from "./text";
 
 function render(props: ComponentProps): JSX.Element {
   switch (props.dsl.type) {
@@ -55,193 +37,13 @@ function render(props: ComponentProps): JSX.Element {
   return <React.Fragment>{JSON.stringify(props.dsl)}</React.Fragment>;
 }
 
-function translate(t: D.TranslableString): string {
-  // TODO: this is just a stub, needs to handle number and date formatting in a localized way.
-  return t.strings.map((s, i) => s + (t.values[i] || "")).join("");
-}
-
-function useObservable<T>(observable$: RX.Observable<T>): T | undefined;
-function useObservable<T>(observable$: RX.Observable<T>, initialValue: T): T;
-function useObservable<T>(
-  observable$: RX.Observable<T>,
-  initialValue?: T
-): T | undefined {
-  const [value, update] = React.useState<T | undefined>(initialValue);
-
-  React.useLayoutEffect(() => {
-    const s = observable$.subscribe(update);
-    return () => s.unsubscribe();
-  }, [observable$]);
-
-  return value;
-}
-
-const noop = () => I.of(undefined);
-const optionHList = O.getEq(hlist);
-function useDslState(props: ComponentProps) {
-  const state$ = React.useContext(StateContext);
-  const { dsl, dispatch, update } = props;
-  const { id } = dsl;
-  const idSerialized = hlist.toString(id);
-
-  const isActive$ = React.useMemo(
-    () => state$.pipe(rxOp.map(state => C.isActive(id, state))),
-    [state$, idSerialized]
-  );
-  const isFocused$ = React.useMemo(
-    () => state$.pipe(rxOp.map(state => C.isFocused(id, state))),
-    [state$, idSerialized]
-  );
-
-  const inputBufferState$ = React.useMemo(
-    () =>
-      state$.pipe(
-        rxOp.map(state =>
-          C.isActive(id, state) ? state.inputBufferState : "valid"
-        )
-      ),
-    [state$, idSerialized]
-  );
-
-  const isActive = useObservable(isActive$, false);
-  const isFocused = useObservable(isFocused$, false);
-  const inputBufferState = useObservable(inputBufferState$, "valid");
-
-  const onFocus = React.useMemo(() => dispatch(C.doFocus(id)), [
-    dispatch,
-    idSerialized,
-    isFocused
-  ]);
-  const onBlur = React.useMemo(() => dispatch(C.doBlur(id)), [
-    dispatch,
-    idSerialized,
-    isFocused
-  ]);
-
-  const onChangeText = React.useMemo(
-    () => (newText: string) =>
-      update(C.doUpdateInputBuffer(id, O.some(newText)))(),
-    [idSerialized, update, isActive]
-  );
-
-  const onTabNext = React.useMemo(
-    () => dispatch(C.setRequestedFocusNext(O.some(id))),
-    [idSerialized, update, isFocused]
-  );
-
-  return {
-    isActive,
-    isFocused,
-    onFocus,
-    onBlur,
-    onChangeText,
-    onTabNext,
-    inputBufferState
-  };
-}
-
-export const RenderInput = React.memo(function InputRenderer(
-  props: ComponentProps
-) {
-  const {
-    isFocused,
-    isActive,
-    onFocus,
-    onBlur,
-    onChangeText,
-    onTabNext,
-    inputBufferState
-  } = useDslState(props);
-  const state$ = React.useContext(StateContext);
-  const { id } = props.dsl;
-  const value = (props.dsl as any).value || "";
-  const idSerialized = hlist.toString(id);
-
-  const ref = React.useRef<TextInput>();
-
-  const rawValue$ = React.useMemo(
-    () =>
-      state$.pipe(
-        rxOp.map(state =>
-          C.isActive(id, state)
-            ? O.getOrElse(() => value)(state.inputBuffer)
-            : value
-        )
-      ),
-    [state$, idSerialized, value]
-  );
-
-  const rawValue = useObservable(rawValue$, value);
-
-  React.useEffect(() => {
-    if (ref.current && isFocused && !ref.current.isFocused()) {
-      ref.current.focus();
-    } else if (ref.current && !isFocused && ref.current.isFocused()) {
-      ref.current.blur();
-    }
-  });
-
-  const onKeyPress = React.useMemo(
-    () => (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-        if(e.nativeEvent.key === "Tab"){
-          console.log("tabbing")
-          onTabNext()
-          e.preventDefault()
-        }
-    },
-    [idSerialized, dispatch]
-  );
-
-  if (props.dsl.type !== "input") return null;
-
-  return (
-    <Item
-      underline
-      error={inputBufferState === "invalid"}
-      onPress={!isFocused ? onFocus : undefined}
-    >
-      <Input
-        ref={c => {
-          ref.current = c ? (c as any)._root : null;
-        }}
-        editable={isActive && isFocused}
-        value={rawValue}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        autoCapitalize="none"
-        selectTextOnFocus={true}
-        onSubmitEditing={onTabNext}
-        blurOnSubmit={false}
-        pointerEvents={!isFocused ? "none" : "auto"}
-        onKeyPress={onKeyPress}
-      />
-      {isActive ? <Icon name="create" onPress={onFocus} /> : null}
-      {isFocused ? <Icon name="arrow-dropleft" /> : null}
-    </Item>
-  );
-});
-
-RenderInput.displayName = "DSL(Input)";
-
-export const RenderText = React.memo(function TextRenderer(
-  props: ComponentProps
-) {
-  if (props.dsl.type !== "text") return null;
-  return <Text>{translate(props.dsl.text)}</Text>;
-});
-RenderText.displayName = "DSL(Text)";
-
 export const RenderButton = React.memo(function ButtonRenderer(
   props: ComponentProps
 ) {
+  const { onPress } = useDslState(props);
   if (props.dsl.type !== "button") return null;
   return (
-    <Button
-      onPress={() => {
-        props.dispatch(C.setPressedId(O.some(props.dsl.id)))();
-        props.dispatch(C.setPressedId(O.none))();
-      }}
-    >
+    <Button onPress={onPress}>
       <Text>{translate(props.dsl.text)}</Text>
     </Button>
   );
@@ -281,12 +83,6 @@ export const RenderList = React.memo(function ListRenderer(
 });
 RenderList.displayName = "DSL(List)";
 
-export const RenderDsl = React.memo(function DslRenderer(
-  props: ComponentProps
-) {
-  return render(props);
-});
-
 export class AppRunner<A> extends React.Component<
   { getApp: I.IO<CW.WidgetBuilder> },
   { dsl: D.DSL }
@@ -303,22 +99,18 @@ export class AppRunner<A> extends React.Component<
   }
 
   getApp(props: { getApp: I.IO<CW.WidgetBuilder> }) {
-    const startedAt = new Date().getTime();
+    CW.timeStart("generate DSL")
     const builtApp = props.getApp();
-    const timeTaken = new Date().getTime() - startedAt;
-    console.log("-> generating DSL took " + timeTaken + "ms");
+    CW.timeEnd()
 
-    const startedAt2 = new Date().getTime();
+    CW.timeStart("build DSL")
     const app = builtApp(C.initialWidgetBuilderState);
-    const timeTaken2 = new Date().getTime() - startedAt2;
-    console.log("-> building DSL took " + timeTaken2 + "ms");
-
+    CW.timeEnd()
     return app;
   }
 
   eventLoop: (initialState: C.WidgetState) => C.WidgetState = initialState => {
-    // time tracking
-    const startedAt = new Date().getTime();
+    CW.timeStart("eventLoop started")
 
     // each frame, we debate if the active element is actually alive
     let currentState = C.newFrame(initialState);
@@ -336,7 +128,9 @@ export class AppRunner<A> extends React.Component<
           newState => newState,
           // we perform the side effect, and then update the app definition
           runEffect => {
+            CW.timeStart("runEffect")
             const state = runEffect();
+            CW.timeEnd()
             this.app = this.getApp(this.props);
             return state;
           },
@@ -368,11 +162,8 @@ export class AppRunner<A> extends React.Component<
       }
     }
     // render
-    const timeTaken = new Date().getTime() - startedAt;
-    console.log("-> event loop took " + timeTaken + "ms");
-
-    // logs processed frames
-    console.log("-> " + frameProcessed + " frames processed");
+    CW.timeEnd()
+    
     return currentState;
   };
 
@@ -398,13 +189,15 @@ export class AppRunner<A> extends React.Component<
   }
 
   render() {
+    CW.timeDump()
+
     return (
       <StateContext.Provider value={this.state$}>
-        <RenderDsl
-          dsl={this.state.dsl}
-          dispatch={this.dispatch}
-          update={this.update}
-        />
+        {render({
+          dsl: this.state.dsl,
+          dispatch: this.dispatch,
+          update: this.update
+        })}
       </StateContext.Provider>
     );
   }

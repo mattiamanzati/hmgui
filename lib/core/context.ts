@@ -1,15 +1,18 @@
 import * as hlist from "../data/hlist";
 import * as O from "fp-ts/lib/Option";
 import { pipe } from "fp-ts/lib/pipeable";
+import * as D from "./dsl"
 
 export type ID = hlist.HList<string>;
 
 export interface WidgetBuilderState {
   currentId: ID;
   enabled: boolean;
+  label: O.Option<D.TranslableString>
 }
 export const initialWidgetBuilderState: WidgetBuilderState = {
   currentId: hlist.nil,
+  label: O.none,
   enabled: true
 };
 
@@ -58,6 +61,16 @@ export const setEnabled: (
 ) => (ctx: WidgetBuilderState) => WidgetBuilderState = enabled => ctx => ({
   ...ctx,
   enabled
+});
+
+
+export const getLabel: (ctx: WidgetBuilderState) => O.Option<D.TranslableString> = ctx =>
+  ctx.label;
+export const setLabel: (
+  label: D.TranslableString
+) => (ctx: WidgetBuilderState) => WidgetBuilderState = label => ctx => ({
+  ...ctx,
+  label: O.some(label)
 });
 
 export function newFrame(state: WidgetState): WidgetState {

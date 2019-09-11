@@ -27,10 +27,6 @@ function render(model: Model) {
               pipe(
                 W.container([
                   pipe(
-                    W.text(W.tr`Counter ${"" + i}:`),
-                    A.id("label" + i)
-                  ),
-                  pipe(
                     W.integer(
                       model[i],
                       name =>
@@ -42,21 +38,25 @@ function render(model: Model) {
                         ),
                       true
                     ),
-                    A.id("name" + i)
+                    A.id("name" + i),
+                    A.label(W.tr`Counter ${"" + i}`)
                   )
                 ]),
                 A.id("div" + i)
               )
             )
             .concat([
-              /*pipe(
-          W.button(W.tr`Log`, () => () => console.log("LOG:", model)),
-          A.id("test")
-        )*/
+              pipe(
+                W.button(() => () => console.log("LOG:", model)),
+                A.label(W.tr`Salva`),
+                A.id("test")
+              )
             ])
         )
       ),
-      A.id("list")(W.list(strings.map(s => A.id(s)(W.container([W.text(W.tr`${s}`)])))))
+      A.id("list")(
+        W.list(strings.map(s => A.id(s)(W.container([W.text(W.tr`${s}`)]))))
+      )
     ]);
 }
 

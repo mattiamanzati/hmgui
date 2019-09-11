@@ -24,7 +24,7 @@ export type DSL =
   | { type: "button"; id: ID; text: TranslableString }
   | { type: "container"; id: ID; children: DSL[] }
   | { type: "list"; id: ID; children: DSL[] }
-  | { type: "input"; id: ID; value: string ; enabled: boolean};
+  | { type: "input"; id: ID; text: TranslableString; value: string ; enabled: boolean};
 
 export const text: (id: ID, text: TranslableString) => DSL = (id, text) => ({
   type: "text",
@@ -46,8 +46,9 @@ export const button: (id: ID, text: TranslableString) => DSL = (id, text) => ({
   id,
   text
 });
-export const input: (id: ID, value: string, enabled: boolean) => DSL = (
+export const input: (id: ID, text: TranslableString, value: string, enabled: boolean) => DSL = (
   id,
+  text,
   value,
   enabled
-) => ({ type: "input", id, value, enabled });
+) => ({ type: "input", id, text, value, enabled });

@@ -20,11 +20,10 @@ export const text: (text: D.TranslableString) => W.WidgetBuilder = text =>
   }));
 
 export const button: (
-  text: D.TranslableString,
   onPress: () => I.IO<void>
-) => W.WidgetBuilder = (text, onPress) =>
+) => W.WidgetBuilder = (onPress) =>
   R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
-    ui: D.button(ctx.currentId, text),
+    ui: D.button(ctx.currentId, O.getOrElse(() => D.tr`Button`)(C.getLabel(ctx))),
     tick: dsl =>
       W.makeInteractive(
         ctx.currentId,
@@ -185,7 +184,7 @@ export const input: (
   isFormatValid: (bufferValue: string) => E.Either<string, string>
 ) => W.WidgetBuilder = (value, onChange, isFormatValid) =>
   R.asks<C.WidgetBuilderState, W.Widget>(ctx => ({
-    ui: D.input(ctx.currentId, value, C.getEnabled(ctx)),
+    ui: D.input(ctx.currentId, O.getOrElse(() => D.tr`Button`)(C.getLabel(ctx)), value, C.getEnabled(ctx)),
     tick: dsl => inputBehaviour(value, isFormatValid, onChange)(ctx)
   }));
 

@@ -3,11 +3,12 @@ import { URIS, Kind } from "fp-ts/lib/HKT";
 export type Next<U extends URIS, A> =
   | { type: "halt" }
   | { type: "continue"; state: A }
-  | { type: "suspendAndResume"; effect: Kind<U, A> };
+  | { type: "suspendAndResume"; effect: Kind<U, A> }
 
-export const halt: <U extends URIS, A>() => Next<U, A> = () => ({
+const _halt = {
   type: "halt"
-});
+};
+export const halt: <U extends URIS, A>() => Next<U, A> = () => _halt as any;
 export const cont: <U extends URIS, A>(state: A) => Next<U, A> = state => ({
   type: "continue",
   state
@@ -15,6 +16,7 @@ export const cont: <U extends URIS, A>(state: A) => Next<U, A> = state => ({
 export const suspendAndResume: <U extends URIS, A>(
   effect: Kind<U, A>
 ) => Next<U, A> = effect => ({ type: "suspendAndResume", effect });
+
 
 export const fold: <U extends URIS, A, B>(
   onContinue: (state: A) => B,
